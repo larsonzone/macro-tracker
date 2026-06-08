@@ -3,78 +3,103 @@ interface MacroCardProps {
   value: number;
   goal: number;
   unit: string;
-  color: string;
+  color: 'gold' | 'emerald' | 'blue' | 'orange';
   icon: string;
   delay?: number;
 }
 
+const COLORS = {
+  gold:    { stroke: '#d4a017', glow: 'rgba(212,160,23,0.35)', text: '#e4b84a', bg: 'rgba(212,160,23,0.06)', border: 'rgba(212,160,23,0.15)' },
+  emerald: { stroke: '#34d399', glow: 'rgba(52,211,153,0.35)',  text: '#34d399', bg: 'rgba(52,211,153,0.06)',  border: 'rgba(52,211,153,0.15)' },
+  blue:    { stroke: '#60a5fa', glow: 'rgba(96,165,250,0.35)',  text: '#60a5fa', bg: 'rgba(96,165,250,0.06)',  border: 'rgba(96,165,250,0.15)' },
+  orange:  { stroke: '#fb923c', glow: 'rgba(251,146,60,0.35)',  text: '#fb923c', bg: 'rgba(251,146,60,0.06)',  border: 'rgba(251,146,60,0.15)' },
+};
+
 export default function MacroCard({ label, value, goal, unit, color, icon, delay = 0 }: MacroCardProps) {
-  const pct = goal > 0 ? Math.min(100, Math.round((value / goal) * 100)) : 0;
+  const pct = goal > 0 ? Math.min(100, (value / goal) * 100) : 0;
   const over = goal > 0 && value > goal;
+  const c = COLORS[color];
 
-  const colorMap: Record<string, { bar: string; text: string; glow: string; bg: string }> = {
-    gold: {
-      bar: 'bg-gold-500',
-      text: 'text-gold-400',
-      glow: 'rgba(212,160,23,0.3)',
-      bg: 'bg-gold-500/10',
-    },
-    emerald: {
-      bar: 'bg-emerald-400',
-      text: 'text-emerald-400',
-      glow: 'rgba(52,211,153,0.3)',
-      bg: 'bg-emerald-400/10',
-    },
-    blue: {
-      bar: 'bg-blue-400',
-      text: 'text-blue-400',
-      glow: 'rgba(96,165,250,0.3)',
-      bg: 'bg-blue-400/10',
-    },
-    orange: {
-      bar: 'bg-orange-400',
-      text: 'text-orange-400',
-      glow: 'rgba(251,146,60,0.3)',
-      bg: 'bg-orange-400/10',
-    },
-  };
+  // SVG ring
+  const size = 80;
+  const r = 32;
+  const circ = 2 * Math.PI * r;
+  const dash = (pct / 100) * circ;
 
-  const c = colorMap[color] ?? colorMap.gold;
+  const displayPct = Math.round(pct);
 
   return (
     <div
-      className="glass-card p-5 animate-slide-up opacity-0"
-      style={{ animationDelay: `${delay}ms`, animationFillMode: 'forwards' }}
+      className="stat-card opacity-0 animate-fade-up"
+      style={{
+        animationDelay: `${delay}ms`,
+        animationFillMode: 'forwards',
+        background: c.bg,
+        border: `1px solid ${c.border}`,
+        boxShadow: `0 0 40px ${c.glow}20`,
+      }}
     >
-      <div className="flex items-start justify-between mb-4">
-        <div>
-          <p className="text-white/40 text-xs uppercase tracking-widest font-sans mb-1">{label}</p>
-          <div className="flex items-baseline gap-1">
-            <span className={`font-display text-3xl font-light ${c.text}`}>{value}</span>
-            <span className="text-white/30 text-sm font-sans">{unit}</span>
-          </div>
-        </div>
-        <div className={`w-10 h-10 rounded-xl ${c.bg} flex items-center justify-center text-xl`}>
-          {icon}
-        </div>
+      {/* Shimmer effect */}
+      <div className="absolute inset-0 overflow-hidden rounded-3xl pointer-events-none">
+        <div
+          className="absolute top-0 left-0 w-full h-px opacity-60"
+          style={{ background: `linear-gradient(90deg, transparent, ${c.stroke}60, transparent)` }}
+        />
       </div>
 
-      {/* Progress bar */}
-      <div className="space-y-1.5">
-        <div className="flex justify-between items-center">
-          <span className="text-white/25 text-xs font-sans">Goal: {goal}{unit}</span>
-          <span className={`text-xs font-sans font-medium ${over ? 'text-red-400' : c.text}`}>
-            {over ? `+${value - goal}${unit}` : `${pct}%`}
-          </span>
+      <div className="flex items-center justify-between">
+        {/* Left: label + value */}
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-lg">{icon}</span>
+            <span className="text-white/40 text-xs font-semibold uppercase tracking-[0.12em]">{label}</span>
+          </div>
+          <div className="flex items-baseline gap-1">
+            <span className="font-display text-4xl font-light" style={{ color: c.text }}>{value}</span>
+            <span className="text-white/30 text-sm font-sans">{unit}</span>
+          </div>
+          <div className="mt-2 flex items-center gap-2">
+            <span className="text-white/20 text-xs">of {goal}{unit}</span>
+            {over && (
+              <span className="text-xs bg-red-500/15 text-red-400 border border-red-500/20 px-2 py-0.5 rounded-full">
+                +{value - goal}
+              </span>
+            )}
+          </div>
         </div>
-        <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all duration-700 ${over ? 'bg-red-400' : c.bar}`}
-            style={{
-              width: `${pct}%`,
-              boxShadow: `0 0 8px ${over ? 'rgba(248,113,113,0.5)' : c.glow}`,
-            }}
-          />
+
+        {/* Right: ring gauge */}
+        <div className="relative shrink-0">
+          <svg width={size} height={size} className="-rotate-90" viewBox={`0 0 ${size} ${size}`}>
+            <circle
+              cx={size/2} cy={size/2} r={r}
+              fill="none"
+              stroke="rgba(255,255,255,0.04)"
+              strokeWidth="6"
+            />
+            {pct > 0 && (
+              <circle
+                cx={size/2} cy={size/2} r={r}
+                fill="none"
+                stroke={over ? '#f87171' : c.stroke}
+                strokeWidth="6"
+                strokeLinecap="round"
+                strokeDasharray={`${dash} ${circ}`}
+                style={{
+                  filter: `drop-shadow(0 0 6px ${over ? '#f8717180' : c.glow})`,
+                  transition: 'stroke-dasharray 1s cubic-bezier(0.34,1.56,0.64,1)',
+                }}
+              />
+            )}
+          </svg>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span
+              className="text-sm font-bold font-sans"
+              style={{ color: over ? '#f87171' : c.text }}
+            >
+              {displayPct}%
+            </span>
+          </div>
         </div>
       </div>
     </div>

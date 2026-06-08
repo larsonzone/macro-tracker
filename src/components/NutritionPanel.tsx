@@ -1,94 +1,70 @@
 import { useMemo } from 'react';
 import { DailyTotals, DailyGoals, NutritionScore } from '../types';
-import { Award, TrendingUp, Zap, Heart } from 'lucide-react';
 
-interface Props {
-  totals: DailyTotals;
-  goals: DailyGoals;
-}
+interface Props { totals: DailyTotals; goals: DailyGoals; }
 
 function computeScores(totals: DailyTotals, goals: DailyGoals): NutritionScore {
-  const calPct = goals.calories > 0 ? totals.calories / goals.calories : 0;
-  const protPct = goals.protein > 0 ? totals.protein / goals.protein : 0;
-  const carbPct = goals.carbs > 0 ? totals.carbs / goals.carbs : 0;
-  const fatPct = goals.fat > 0 ? totals.fat / goals.fat : 0;
+  const calPct  = goals.calories > 0 ? totals.calories / goals.calories : 0;
+  const protPct = goals.protein  > 0 ? totals.protein  / goals.protein  : 0;
+  const carbPct = goals.carbs    > 0 ? totals.carbs    / goals.carbs    : 0;
+  const fatPct  = goals.fat      > 0 ? totals.fat      / goals.fat      : 0;
 
-  // Protein score: ideal 90-110%
-  const proteinScore = Math.round(
-    protPct >= 0.9 && protPct <= 1.1 ? 95
-    : protPct >= 0.75 ? 80
-    : protPct >= 0.5 ? 60
-    : protPct * 80
-  );
-
-  // Metabolic score: based on overall calorie balance
-  const metabolicScore = Math.round(
-    calPct >= 0.85 && calPct <= 1.05 ? 92
-    : calPct >= 0.7 && calPct <= 1.2 ? 75
-    : calPct < 0.5 ? 45
-    : 60
-  );
-
-  // Body composition: protein + fat balance
-  const bcScore = Math.round(
-    (proteinScore * 0.6 + (fatPct > 0.5 && fatPct < 1.1 ? 90 : 60) * 0.4)
-  );
-
-  // Food quality: penalise very high fat relative to carbs/protein
-  const totalMacroG = totals.protein + totals.carbs + totals.fat;
-  const fatRatio = totalMacroG > 0 ? totals.fat / totalMacroG : 0;
-  const foodQuality = Math.round(
-    fatRatio < 0.25 ? 88 : fatRatio < 0.35 ? 78 : fatRatio < 0.45 ? 65 : 50
-  );
-
-  const overall = Math.round((proteinScore + metabolicScore + bcScore + foodQuality) / 4);
+  const proteinScore     = Math.round(protPct >= 0.9 && protPct <= 1.1 ? 95 : protPct >= 0.75 ? 80 : protPct >= 0.5 ? 60 : protPct * 80);
+  const metabolicScore   = Math.round(calPct  >= 0.85 && calPct  <= 1.05 ? 92 : calPct >= 0.7 && calPct <= 1.2 ? 75 : calPct < 0.5 ? 45 : 60);
+  const totalMacroG      = totals.protein + totals.carbs + totals.fat;
+  const fatRatio         = totalMacroG > 0 ? totals.fat / totalMacroG : 0;
+  const bcScore          = Math.round(proteinScore * 0.6 + (fatPct > 0.5 && fatPct < 1.1 ? 90 : 60) * 0.4);
+  const foodQuality      = Math.round(fatRatio < 0.25 ? 88 : fatRatio < 0.35 ? 78 : fatRatio < 0.45 ? 65 : 50);
+  const overall          = Math.round((proteinScore + metabolicScore + bcScore + foodQuality) / 4);
 
   const recommendations: string[] = [];
-  if (protPct < 0.7) recommendations.push('Increase protein intake to support muscle recovery and satiety.');
-  if (calPct < 0.7) recommendations.push('You\'re under your calorie goal — ensure adequate fueling for your activity level.');
-  if (calPct > 1.2) recommendations.push('Caloric intake is above goal today — consider lighter options tomorrow.');
-  if (carbPct > 1.3) recommendations.push('Carbohydrate intake is elevated — favour complex sources like oats, sweet potato, and legumes.');
-  if (fatRatio > 0.4) recommendations.push('High fat ratio detected — balance with lean proteins and fibrous vegetables.');
-  if (recommendations.length === 0) recommendations.push('Excellent balance today — your macros are well-aligned with your goals.');
-  if (protPct >= 0.9 && protPct <= 1.1) recommendations.push('Protein target is on track — great for body composition support.');
+  if (protPct < 0.7)   recommendations.push('Boost protein — aim for lean meats, eggs, or legumes at your next meal.');
+  if (calPct  < 0.7)   recommendations.push("You're under your calorie goal — make sure you're fuelling your activity.");
+  if (calPct  > 1.2)   recommendations.push('Slightly over calories today — go lighter tomorrow to rebalance.');
+  if (carbPct > 1.3)   recommendations.push('High carbs — swap refined grains for oats, sweet potato, or quinoa.');
+  if (fatRatio > 0.4)  recommendations.push('Fat ratio is high — balance with lean protein and fibrous veggies.');
+  if (!recommendations.length) recommendations.push('Perfect balance today — your macros are exactly on target. Keep it up!');
+  if (protPct >= 0.9 && protPct <= 1.1) recommendations.push('Protein is spot on — great for muscle recovery and satiety.');
 
   return { overall, protein: proteinScore, metabolic: metabolicScore, bodyComposition: bcScore, foodQuality, recommendations };
 }
 
-function ScoreRing({ value, label, icon: Icon, color }: { value: number; label: string; icon: React.ElementType; color: string }) {
-  const r = 28;
-  const circ = 2 * Math.PI * r;
-  const dash = (value / 100) * circ;
+interface ScoreGaugeProps { value: number; label: string; emoji: string; color: string; glow: string; delay: number; }
 
-  const colorMap: Record<string, { stroke: string; text: string; bg: string }> = {
-    gold: { stroke: '#d4a017', text: 'text-gold-400', bg: 'text-gold-500/20' },
-    emerald: { stroke: '#34d399', text: 'text-emerald-400', bg: 'text-emerald-400/20' },
-    blue: { stroke: '#60a5fa', text: 'text-blue-400', bg: 'text-blue-400/20' },
-    purple: { stroke: '#a78bfa', text: 'text-purple-400', bg: 'text-purple-400/20' },
-  };
-  const c = colorMap[color] ?? colorMap.gold;
+function ScoreGauge({ value, label, emoji, color, glow, delay }: ScoreGaugeProps) {
+  const r = 26; const circ = 2 * Math.PI * r;
+  const dash = (value / 100) * circ;
+  const grade = value >= 90 ? 'S' : value >= 80 ? 'A' : value >= 70 ? 'B' : value >= 60 ? 'C' : 'D';
 
   return (
-    <div className="flex flex-col items-center gap-2">
-      <div className="relative w-16 h-16">
-        <svg className="w-full h-full -rotate-90" viewBox="0 0 70 70">
-          <circle cx="35" cy="35" r={r} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="4" />
+    <div
+      className="flex flex-col items-center gap-3 opacity-0 animate-fade-up"
+      style={{ animationDelay: `${delay}ms`, animationFillMode: 'forwards' }}
+    >
+      <div className="relative w-[72px] h-[72px]">
+        {/* Outer glow ring */}
+        <div
+          className="absolute inset-0 rounded-full animate-pulse-ring"
+          style={{ boxShadow: `0 0 16px ${glow}`, opacity: 0.4 }}
+        />
+        <svg className="w-full h-full -rotate-90" viewBox="0 0 72 72">
+          <circle cx="36" cy="36" r={r} fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="5" />
           <circle
-            cx="35" cy="35" r={r}
-            fill="none"
-            stroke={c.stroke}
-            strokeWidth="4"
-            strokeLinecap="round"
+            cx="36" cy="36" r={r} fill="none"
+            stroke={color} strokeWidth="5" strokeLinecap="round"
             strokeDasharray={`${dash} ${circ}`}
-            style={{ filter: `drop-shadow(0 0 4px ${c.stroke}55)`, transition: 'stroke-dasharray 0.8s ease' }}
+            style={{ filter: `drop-shadow(0 0 5px ${color}99)`, transition: 'stroke-dasharray 1.2s cubic-bezier(0.34,1.56,0.64,1)' }}
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <Icon className={`w-3 h-3 ${c.text} mb-0.5`} />
-          <span className={`text-xs font-sans font-semibold ${c.text}`}>{value}</span>
+          <span className="text-base font-black font-sans" style={{ color }}>{grade}</span>
         </div>
       </div>
-      <span className="text-white/40 text-xs font-sans text-center leading-tight">{label}</span>
+      <div className="text-center">
+        <div className="text-base mb-0.5">{emoji}</div>
+        <div className="text-white/50 text-xs font-sans leading-tight text-center">{label}</div>
+        <div className="text-xs font-bold mt-0.5" style={{ color }}>{value}</div>
+      </div>
     </div>
   );
 }
@@ -96,95 +72,117 @@ function ScoreRing({ value, label, icon: Icon, color }: { value: number; label: 
 export default function NutritionPanel({ totals, goals }: Props) {
   const scores = useMemo(() => computeScores(totals, goals), [totals, goals]);
 
-  const overallColor = scores.overall >= 80 ? 'text-emerald-400' : scores.overall >= 60 ? 'text-gold-400' : 'text-red-400';
-  const overallBg = scores.overall >= 80 ? 'from-emerald-500/10 to-transparent' : scores.overall >= 60 ? 'from-gold-500/10 to-transparent' : 'from-red-500/10 to-transparent';
-  const overallLabel = scores.overall >= 85 ? 'Excellent' : scores.overall >= 70 ? 'Good' : scores.overall >= 55 ? 'Fair' : 'Needs Work';
+  const overallColor = scores.overall >= 80 ? '#34d399' : scores.overall >= 60 ? '#d4a017' : '#f87171';
+  const overallLabel = scores.overall >= 90 ? 'Elite' : scores.overall >= 80 ? 'Excellent' : scores.overall >= 70 ? 'Great' : scores.overall >= 55 ? 'Fair' : 'Needs Work';
 
   const totalMacroG = totals.protein + totals.carbs + totals.fat;
-  const macroBreakdown = totalMacroG > 0 ? {
+  const mb = totalMacroG > 0 ? {
     protein: Math.round((totals.protein / totalMacroG) * 100),
-    carbs: Math.round((totals.carbs / totalMacroG) * 100),
-    fat: Math.round((totals.fat / totalMacroG) * 100),
+    carbs:   Math.round((totals.carbs   / totalMacroG) * 100),
+    fat:     Math.round((totals.fat     / totalMacroG) * 100),
   } : { protein: 0, carbs: 0, fat: 0 };
 
+  const remaining = goals.calories - totals.calories;
+
+  // Big master ring
+  const bigR = 54; const bigCirc = 2 * Math.PI * bigR;
+  const bigDash = (Math.min(100, scores.overall) / 100) * bigCirc;
+
   return (
-    <div className="glass-card gold-border overflow-hidden animate-fade-in">
-      {/* Header band */}
-      <div className={`bg-gradient-to-r ${overallBg} border-b border-white/5 px-6 py-4`}>
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-white/40 text-xs uppercase tracking-widest font-sans">Nutrition Report</p>
-            <h3 className="font-display text-xl text-white font-light mt-0.5">Daily Summary</h3>
+    <div className="glass rounded-3xl overflow-hidden">
+      {/* Hero section */}
+      <div className="relative p-6 pb-4" style={{ background: 'radial-gradient(ellipse at top, rgba(212,160,23,0.08) 0%, transparent 70%)' }}>
+        <div className="absolute top-0 left-0 right-0 h-px" style={{ background: 'linear-gradient(90deg, transparent, rgba(212,160,23,0.4), transparent)' }} />
+
+        <p className="text-white/35 text-xs font-semibold uppercase tracking-[0.15em] mb-4">Daily Report</p>
+
+        <div className="flex items-center gap-6">
+          {/* Master score ring */}
+          <div className="relative shrink-0">
+            <svg width="140" height="140" className="-rotate-90" viewBox="0 0 140 140">
+              <circle cx="70" cy="70" r={bigR} fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="8" />
+              <circle cx="70" cy="70" r={bigR} fill="none"
+                stroke={overallColor} strokeWidth="8" strokeLinecap="round"
+                strokeDasharray={`${bigDash} ${bigCirc}`}
+                style={{
+                  filter: `drop-shadow(0 0 10px ${overallColor}80)`,
+                  transition: 'stroke-dasharray 1.5s cubic-bezier(0.34,1.56,0.64,1)',
+                }}
+              />
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <span className="font-display text-5xl font-light" style={{ color: overallColor }}>{scores.overall}</span>
+              <span className="text-xs font-bold uppercase tracking-widest mt-0.5" style={{ color: overallColor }}>{overallLabel}</span>
+            </div>
           </div>
-          <div className="text-right">
-            <div className={`font-display text-5xl font-light ${overallColor}`}>{scores.overall}</div>
-            <div className={`text-xs font-sans font-medium ${overallColor} mt-0.5`}>{overallLabel}</div>
+
+          {/* Stats column */}
+          <div className="flex-1 space-y-3">
+            {[
+              { label: 'Consumed', val: totals.calories, unit: 'kcal', color: '#d4a017' },
+              { label: 'Remaining', val: remaining, unit: 'kcal', color: remaining >= 0 ? '#34d399' : '#f87171' },
+              { label: 'Protein', val: totals.protein, unit: 'g', color: '#34d399' },
+            ].map(item => (
+              <div key={item.label} className="flex items-center justify-between">
+                <span className="text-white/35 text-xs font-sans">{item.label}</span>
+                <span className="font-display text-lg font-light" style={{ color: item.color }}>
+                  {item.val}<span className="text-xs text-white/30 ml-0.5">{item.unit}</span>
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       </div>
 
-      <div className="p-6 space-y-6">
-        {/* Macro breakdown bar */}
+      <div className="px-6 pb-6 space-y-5">
+        {/* Macro bar */}
         <div>
-          <p className="text-white/40 text-xs uppercase tracking-widest font-sans mb-3">Macro Distribution</p>
-          <div className="flex rounded-full overflow-hidden h-2 gap-0.5">
-            <div className="bg-emerald-400 transition-all duration-700" style={{ width: `${macroBreakdown.protein}%` }} title={`Protein ${macroBreakdown.protein}%`} />
-            <div className="bg-gold-400 transition-all duration-700" style={{ width: `${macroBreakdown.carbs}%` }} title={`Carbs ${macroBreakdown.carbs}%`} />
-            <div className="bg-orange-400 transition-all duration-700" style={{ width: `${macroBreakdown.fat}%` }} title={`Fat ${macroBreakdown.fat}%`} />
+          <div className="flex justify-between items-center mb-2">
+            <span className="label-xs">Macro Split</span>
           </div>
-          <div className="flex gap-4 mt-2">
+          <div className="flex h-3 rounded-full overflow-hidden gap-0.5">
+            <div className="bg-emerald-400 transition-all duration-700 rounded-l-full" style={{ width: `${mb.protein}%` }} />
+            <div className="bg-gold-400 transition-all duration-700" style={{ width: `${mb.carbs}%` }} />
+            <div className="bg-orange-400 transition-all duration-700 rounded-r-full" style={{ width: `${mb.fat}%` }} />
+          </div>
+          <div className="flex gap-4 mt-2.5">
             {[
-              { label: 'Protein', pct: macroBreakdown.protein, color: 'bg-emerald-400', g: totals.protein },
-              { label: 'Carbs', pct: macroBreakdown.carbs, color: 'bg-gold-400', g: totals.carbs },
-              { label: 'Fat', pct: macroBreakdown.fat, color: 'bg-orange-400', g: totals.fat },
+              { l: 'Protein', p: mb.protein, g: totals.protein, c: 'bg-emerald-400', t: 'text-emerald-400' },
+              { l: 'Carbs',   p: mb.carbs,   g: totals.carbs,   c: 'bg-gold-400',    t: 'text-gold-400' },
+              { l: 'Fat',     p: mb.fat,     g: totals.fat,     c: 'bg-orange-400',  t: 'text-orange-400' },
             ].map(item => (
-              <div key={item.label} className="flex items-center gap-1.5">
-                <div className={`w-2 h-2 rounded-full ${item.color}`} />
-                <span className="text-white/40 text-xs font-sans">{item.label} {item.pct}% · {item.g}g</span>
+              <div key={item.l} className="flex items-center gap-1.5 flex-1">
+                <div className={`w-2 h-2 rounded-full ${item.c} shrink-0`} />
+                <div>
+                  <div className={`text-xs font-bold ${item.t}`}>{item.g}g</div>
+                  <div className="text-white/25 text-xs">{item.l} {item.p}%</div>
+                </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Calorie summary */}
-        <div className="flex items-center gap-4 p-4 rounded-xl bg-white/3 border border-white/5">
-          <div className="flex-1">
-            <p className="text-white/30 text-xs font-sans">Total Calories</p>
-            <p className="font-display text-2xl text-gold-400 font-light">{totals.calories}</p>
-          </div>
-          <div className="w-px h-10 bg-white/10" />
-          <div className="flex-1">
-            <p className="text-white/30 text-xs font-sans">Calorie Goal</p>
-            <p className="font-display text-2xl text-white/60 font-light">{goals.calories}</p>
-          </div>
-          <div className="w-px h-10 bg-white/10" />
-          <div className="flex-1">
-            <p className="text-white/30 text-xs font-sans">Remaining</p>
-            <p className={`font-display text-2xl font-light ${goals.calories - totals.calories >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-              {goals.calories - totals.calories}
-            </p>
-          </div>
-        </div>
-
-        {/* Score rings */}
+        {/* Score gauges */}
         <div>
-          <p className="text-white/40 text-xs uppercase tracking-widest font-sans mb-4">Score Breakdown</p>
-          <div className="grid grid-cols-4 gap-4">
-            <ScoreRing value={scores.protein} label="Protein Score" icon={TrendingUp} color="emerald" />
-            <ScoreRing value={scores.metabolic} label="Metabolic Score" icon={Zap} color="gold" />
-            <ScoreRing value={scores.bodyComposition} label="Body Comp." icon={Heart} color="blue" />
-            <ScoreRing value={scores.foodQuality} label="Food Quality" icon={Award} color="purple" />
+          <span className="label-xs">Score Breakdown</span>
+          <div className="grid grid-cols-4 gap-2 mt-3">
+            <ScoreGauge value={scores.protein}         label="Protein"   emoji="🥩" color="#34d399" glow="rgba(52,211,153,0.4)"  delay={0} />
+            <ScoreGauge value={scores.metabolic}       label="Metabolic" emoji="⚡" color="#d4a017" glow="rgba(212,160,23,0.4)" delay={100} />
+            <ScoreGauge value={scores.bodyComposition} label="Body Comp" emoji="💪" color="#60a5fa" glow="rgba(96,165,250,0.4)"  delay={200} />
+            <ScoreGauge value={scores.foodQuality}     label="Quality"   emoji="🌿" color="#c084fc" glow="rgba(192,132,252,0.4)" delay={300} />
           </div>
         </div>
 
         {/* Recommendations */}
         <div>
-          <p className="text-white/40 text-xs uppercase tracking-widest font-sans mb-3">Recommendations</p>
-          <div className="space-y-2">
+          <span className="label-xs">Insights</span>
+          <div className="space-y-2 mt-2">
             {scores.recommendations.map((rec, i) => (
-              <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-white/3 border border-white/5">
-                <div className="w-1.5 h-1.5 rounded-full bg-gold-400 mt-1.5 shrink-0" />
-                <p className="text-white/60 text-sm font-sans leading-relaxed">{rec}</p>
+              <div key={i} className="flex gap-3 p-3 rounded-2xl bg-white/3 border border-white/5">
+                <span className="text-base shrink-0">
+                  {i === 0 ? '🎯' : i === 1 ? '💡' : '✨'}
+                </span>
+                <p className="text-white/55 text-xs font-sans leading-relaxed">{rec}</p>
               </div>
             ))}
           </div>
